@@ -53,13 +53,13 @@ h2{font-size:clamp(20px,5.5vw,28px);font-weight:800}
 <div id="screenStart" class="screen">
  <div class="card">
   <h1>Ритм-Змейка</h1>
-  <div class="sub">кнопки • мелодия • барабаны • змейка</div>
+  <div class="sub">4 кнопки • белая линия • змейка</div>
   <div class="how">
-   <div class="row"><span class="ic">🔢</span><span>На каждую кнопку летит цифра-нота. Жми кнопку, когда нота до неё доедет. Цифры видны под кнопками и на самих нотах.</span></div>
-   <div class="row"><span class="ic">🥁</span><span>Двойной барабанный ряд: <b style="color:#74c0fc">БАМ</b> (левый большой палец) и <b style="color:#ffa94d">ЦСС</b> (правый). Прилетит табличка <b style="color:#b197fc">ВМЕСТЕ!</b> — бей двумя пальцами сразу!</span></div>
-   <div class="row"><span class="ic">🖐️</span><span>Длинные ноты — прижми кнопку и держи, пока хвост ноты не пройдёт.</span></div>
-   <div class="row"><span class="ic">🐍</span><span>Волна — веди пальцем змейку вдоль волнистой дорожки, не упусти её!</span></div>
-   <div class="row"><span class="ic">⌨️</span><span>На компьютере: клавиши 1–7 — мелодия, Z и X — барабаны.</span></div>
+   <div class="row"><span class="ic">🎯</span><span>Ноты летят на кнопки <b style="color:#ff6b6b">1</b> и <b style="color:#339af0">2</b> в центре. Жми, когда нота коснётся <b style="color:#fff">белой линии</b>. Попал точно на линию — <b style="color:#ffd43b">ИДЕАЛЬНО</b> и больше очков!</span></div>
+   <div class="row"><span class="ic">🥁</span><span>Барабаны по краям: <b style="color:#74c0fc">БАМ</b> слева, <b style="color:#ffa94d">ЦСС</b> справа. Левый большой палец — БАМ и нота 1, правый — нота 2 и ЦСС. Табличка <b style="color:#b197fc">ВМЕСТЕ! 👐</b> — ударь по обоим барабанам разом!</span></div>
+   <div class="row"><span class="ic">🖐️</span><span>Длинные ноты — прижми кнопку и держи, пока хвост не пройдёт.</span></div>
+   <div class="row"><span class="ic">🐍</span><span>Волна — веди пальцем змейку вдоль дорожки, не упусти!</span></div>
+   <div class="row"><span class="ic">⌨️</span><span>Клавиши: <b>1</b> и <b>2</b> — ноты, <b>Z</b> и <b>X</b> (или ← и →) — барабаны.</span></div>
   </div>
   <button class="bigbtn" id="btnStart">▶ ИГРАТЬ</button>
  </div>
@@ -97,16 +97,15 @@ h2{font-size:clamp(20px,5.5vw,28px);font-weight:800}
 /* ================= КОНСТАНТЫ ================= */
 const $=s=>document.querySelector(s);
 const cv=$('#cv'), ctx=cv.getContext('2d');
-const CFG={bpm:100, approach:1.8, lead:2.4, perfTol:0.12, holdTol:0.22, drumTol:0.26, waveR:42};
-const BEAT=60/CFG.bpm;                    // 0.6 c
-const COLORS=['#ff6b6b','#ffa94d','#ffd43b','#51cf66','#339af0','#b197fc','#f783ac'];
-const NOTE_RU=['ЛЯ','СИ','ДО','РЕ','МИ','ФА','СОЛЬ'];
-const FREQ=[220,246.94,261.63,293.66,329.63,349.23,392];   // ля минор: 1..7
+const CFG={bpm:108, approach:1.8, lead:2.4, perfTol:0.10, goodTol:0.20, holdTol:0.20, drumTol:0.26, waveR:42};
+const BEAT=60/CFG.bpm;                     // 0.556 c — бодрые ровные четверти
+const LANE_COLORS=['#ff6b6b','#339af0'];   // кнопки 1 и 2
+const FREQ=[220,246.94,261.63,293.66,329.63,349.23,392];   // ля минор: ступени 1..7
 const CHORDS=[['Am',[220,261.63,329.63],110],['F',[174.61,220,261.63],87.31],
               ['C',[261.63,329.63,392],130.81],['G',[196,246.94,293.66],98]];
 const TOTAL_BARS=31;
 
-/* ================= РАСКЛАДКА (кнопки НИКОГДА не пересекаются) ================= */
+/* ================= РАСКЛАДКА: [БАМ] [1] [2] [ЦСС] + белая линия ================= */
 let W=0,H=0,DPR=1;
 const L={};
 function layout(){
@@ -116,33 +115,31 @@ function layout(){
   ctx.setTransform(DPR,0,0,DPR,0,0);
   const cw=Math.min(W,520); L.cw=cw; L.ox=(W-cw)/2;
   L.hudH=56;
-  const bottomM=10+ (window.visualViewport?0:0);
-  L.padH=Math.max(72,Math.min(96,H*0.115));
-  L.drumY=H-bottomM-L.padH;                       // верх барабанных пэдов
-  L.stripH=36; L.stripGap=8;                      // зона ЦИФР ПОД кнопками
-  L.stripTop=L.drumY-L.stripGap-L.stripH;         // верх полосы цифр
-  const mrg=8, gapM=cw<360?4:6;
-  L.bw=Math.max(34,(cw-2*mrg-6*gapM)/7);          // ширина кнопки — всегда > 0, зазор всегда есть
-  L.bh=Math.max(52,Math.min(66,H*0.078));
-  L.gapM=gapM; L.mrg=mrg;
-  L.melY=L.stripTop-8-L.bh;                       // верх кнопок мелодии
+  const bottomM=10;
+  L.bh=Math.max(58,Math.min(74,H*0.088));
+  L.rowY=H-bottomM-L.bh;                 // верх ряда из 4 кнопок
+  L.lineY=L.rowY-36;                     // белая линия нажатия — чуть выше кнопок
+  L.mrg=10; L.gap=8;
+  L.bw=Math.max(56,(cw-2*L.mrg-3*L.gap)/4.8);   // нота
+  L.pw=L.bw*1.4;                                // барабан шире
+  L.nbX=[L.mrg+L.pw+L.gap, L.mrg+L.pw+L.gap+L.bw+L.gap];      // x кнопок 1,2 (относ. ox)
+  L.padX=[L.mrg, L.mrg+2*(L.pw+L.gap)+L.bw];                  // x пэдов
+  L.padSplit=L.ox+L.mrg+L.pw+L.gap+2*L.bw+L.gap+L.pw/2;       // граница лев/прав в зоне барабанов
   L.hiwayTop=L.hudH+10;
-  L.hitY=L.melY+L.bh*0.5;
-  L.band=[L.hiwayTop+26, L.melY-64];
+  L.band=[L.hiwayTop+26, L.lineY-75];
   L.waveY=(L.band[0]+L.band[1])/2;
   L.waveA=Math.max(50,Math.min(112,(L.band[1]-L.band[0])/2-24));
-  L.pw=(cw-32-14)/2; L.padGapX=[L.ox+16, L.ox+16+L.pw+14];
   bgGrad=null;
 }
-function melBtn(i){ return {x:L.ox+L.mrg+i*(L.bw+L.gapM), w:L.bw, cx:L.ox+L.mrg+i*(L.bw+L.gapM)+L.bw/2}; }
-function laneX(deg){ return melBtn(deg-1).cx; }
-function padRect(p){ return {x:L.padGapX[p], w:L.pw, cx:L.padGapX[p]+L.pw/2, y:L.drumY, h:L.padH}; }
-function padMidX(){ return (L.padGapX[0]+L.pw/2 + L.padGapX[1]+L.pw/2)/2; }
+function noteBtn(i){ return {x:L.ox+L.nbX[i], w:L.bw, cx:L.ox+L.nbX[i]+L.bw/2}; }
+function laneX(lane){ return noteBtn(lane-1).cx; }
+function padRect(p){ return {x:L.ox+L.padX[p], w:L.pw, cx:L.ox+L.padX[p]+L.pw/2, y:L.rowY, h:L.bh}; }
+function padMidX(){ return (padRect(0).cx+padRect(1).cx)/2; }
 
 /* ================= АУДИО ================= */
 let AC=null, master=null, comp=null, delayN=null, noiseBuf=null;
 function ensureAudio(){
-  if(AC) { if(AC.state==='suspended') AC.resume(); return; }
+  if(AC){ if(AC.state==='suspended')AC.resume(); return; }
   AC=new (window.AudioContext||window.webkitAudioContext)();
   comp=AC.createDynamicsCompressor(); comp.threshold.value=-14; comp.connect(AC.destination);
   master=AC.createGain(); master.gain.value=0.9; master.connect(comp);
@@ -207,9 +204,7 @@ function playBass(when,f){
   o.connect(lp); lp.connect(g); g.connect(master); o.start(when); o.stop(when+0.55);
 }
 function vibrate(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){} }
-
-/* ================= НОТЫ КУРСАНТЫ ================= */
-function startHoldSound(n){ if(!AC)return; 
+function startHoldSound(n){ if(!AC)return;
   const f=FREQ[n.deg-1]*(n.oct?2:1);
   const o=AC.createOscillator(),g=AC.createGain();
   o.type='triangle'; o.frequency.value=f;
@@ -227,52 +222,76 @@ function stopHoldSound(n){ if(!n.hOsc)return; const t=AC.currentTime;
   n.hOsc.stop(t+0.25); n.hOsc=null;
 }
 
-/* ================= ПАРТИТУРА ================= */
-let M=[],D=[],WV=[],EV=[],totalSec=0,totalJ=0;
+/* ================= ПАРТИТУРА: ровные четверти «по 4», 2 дорожки =================
+   Чётные доли (0,2) — нота 2 (правый палец), нечётные (1,3) — нота 1 (левый):
+   левый палец занят БАМом на 0 и 2, правый ЦССом на 1 и 3 — коллизий нет.
+   [доля, дорожка, длительность, ступень]                                          */
 const S=(b,beat)=>(b*4+beat)*BEAT;
-const VERSE=[
- [[0,1,1],[1,3,1],[2,5,2]], [[0,6,1],[1,5,1],[2,3,2]],
- [[0,1,1],[1,3,1],[2,5,1],[3,6,1]], [[0,5,3]],
- [[0,3,1],[1,4,1],[2,5,1],[3,6,1]], [[0,7,1],[1,6,1],[2,5,2]],
- [[0,6,1],[1,5,1],[2,3,1],[3,2,1]], [[0,1,4]]
+const V=[
+ [[0,2,1,1],[1,1,1,3],[2,2,1,5],[3,1,1,3]],
+ [[0,2,1,6],[1,1,1,5],[2,2,1,3],[3,1,1,2]],
+ [[0,2,1,1],[1,1,1,3],[2,2,1,5],[3,1,1,6]],
+ [[0,2,3,5]],
+ [[0,2,1,3],[1,1,1,4],[2,2,1,5],[3,1,1,6]],
+ [[0,2,1,7],[1,1,1,6],[2,2,1,5],[3,1,1,3]],
+ [[0,2,1,6],[1,1,1,5],[2,2,1,3],[3,1,1,2]],
+ [[0,2,4,1]]
 ];
-const CHORUS=[
- [[0,5,.5],[.5,5,.5],[1,6,1],[2,7,2]], [[0,7,.5],[.5,6,.5],[1,5,1],[2,6,2]],
- [[0,5,.5],[.5,5,.5],[1,6,1],[2,7,1],[3,1,1]], [[0,7,1],[1,6,1],[2,5,2]],
- [[0,6,.5],[.5,6,.5],[1,7,1],[2,1,1],[3,7,1]], [[0,6,1],[1,5,1],[2,3,2]],
- [[0,5,1],[1,6,1],[2,7,1],[3,6,1]], [[0,5,3]]
+const C=[
+ [[0,2,1,5],[1,1,1,6],[2,2,1,7],[3,1,1,1]],
+ [[0,2,1,7],[1,1,1,6],[2,2,1,5],[3,1,1,6]],
+ [[0,2,.5,5],[.5,2,.5,6],[1,1,1,7],[2,2,1,1],[3,1,1,7]],
+ [[0,2,1,6],[1,1,1,5],[2,2,1,4],[3,1,1,3]],
+ [[1,1,1,6],[2,2,1,7],[3,1,1,6]],
+ [[0,2,1,5],[1,1,1,6],[2,2,1,7],[3,1,1,5]],
+ [[0,2,.5,6],[.5,2,.5,7],[1,1,1,1],[2,2,1,7],[3,1,1,6]],
+ [[0,2,1,5],[1,1,1,6],[2,2,1,7],[3,1,1,5]]
 ];
-const BRIDGE=[[[0,3,2],[2,5,1],[3,4,1]],[[0,2,2],[2,1,1],[3,2,1]]];
-const FINAL=[
- [[0,5,.5],[.5,6,.5],[1,7,1],[2,1,1],[3,7,1]], [[0,1,1],[1,7,1],[2,6,1],[3,5,1]],
- [[0,6,.5],[.5,7,.5],[1,1,2]], [[0,7,1],[1,6,1],[2,5,1],[3,3,1]],
+const BR=[
+ [[0,2,2,3],[2,1,1,5],[3,1,1,4]],
+ [[0,2,2,2],[2,1,1,1],[3,1,1,2]]
+];
+const F=[
+ [[1,1,1,5],[2,2,1,6],[3,1,1,7]],
+ [[0,2,1,1],[1,1,1,7],[2,2,1,6],[3,1,1,5]],
+ [[0,2,.5,6],[.5,2,.5,7],[1,1,1,1],[2,2,1,7],[3,1,1,6]],
+ [[0,2,1,5],[1,1,1,6],[2,2,1,5],[3,1,1,3]],
  null,null,
- [[0,5,1],[1,6,1],[2,7,1],[3,1,1]], [[0,6,1],[2,7,1]], [[0,1,4]]
+ [[0,2,1,5],[1,1,1,6],[2,2,1,7],[3,1,1,1]],
+ [[1,1,1,6],[2,2,1,7],[3,1,1,6]],
+ [[0,2,4,1]]
 ];
+let M=[],D=[],WV=[],EV=[],totalSec=0,totalJ=0;
 function buildChart(){
   M=[];D=[];WV=[];EV=[];
-  const pushMel=(b,arr,oct)=>{ for(const [bt,d,du] of arr)
-    M.push({t:S(b,bt),deg:d,oct,dur:du,hold:du>=2,judged:false,hit:false,popT:0,
+  const pushMel=(b,arr,oct)=>{ for(const [bt,lane,du,deg] of arr)
+    M.push({t:S(b,bt),lane,dur:du,deg,oct,hold:du>=2,judged:false,hit:false,popT:0,
             holdActive:false,holdDone:false,accPts:0,hOsc:null}); };
-  VERSE.forEach((a,i)=>pushMel(2+i,a,0));
-  CHORUS.forEach((a,i)=>pushMel(10+i,a,1));
-  pushMel(20,BRIDGE[0],0); pushMel(21,BRIDGE[1],0);
-  FINAL.forEach((a,i)=>{ if(a) pushMel(22+i,a,1); });
-  const pushDrum=(b,kicks,snares,both)=>{
-    kicks.forEach(k=>D.push({t:S(b,k),type:'L',done:false}));
-    snares.forEach(k=>D.push({t:S(b,k),type:'R',done:false}));
-    if(both)D.push({t:S(b,0),type:'B',done:false,l:false,r:false});
-  };
-  pushDrum(0,[0,2],[1,3],true); pushDrum(1,[0,2],[1,3]);
-  for(let b=2;b<10;b++) pushDrum(b,b===7?[0,1.5,2]:[0,2],[1,3]);
-  for(let b=10;b<18;b++) pushDrum(b,[0,1.5,2.5],[1,3],b===10||b===14);
-  pushDrum(18,[0],[3]); pushDrum(19,[0],[2]);
-  pushDrum(20,[0,2],[1,3]); pushDrum(21,[0,2],[1,3]);
-  for(let b=22;b<26;b++) pushDrum(b,[0,1.5,2.5],[1,3],b===22||b===25);
-  pushDrum(26,[0],[3]); pushDrum(27,[0],[3]);
-  pushDrum(28,[0,1.5,2.5],[1,3]); pushDrum(29,[0,1.5,2.5],[1,3]);
-  pushDrum(30,[0],[2],true);
-  // двойной удар «ВМЕСТЕ!» заменяет одиночные кии/снэры в тот же момент
+  V.forEach((a,i)=>pushMel(2+i,a,0));
+  C.forEach((a,i)=>pushMel(10+i,a,1));
+  BR.forEach((a,i)=>pushMel(20+i,a,0));
+  F.forEach((a,i)=>{ if(a) pushMel(22+i,a,1); });
+  const kick=(b,xs)=>xs.forEach(k=>D.push({t:S(b,k),type:'L',done:false}));
+  const snare=(b,xs)=>xs.forEach(k=>D.push({t:S(b,k),type:'R',done:false}));
+  const both=b=>D.push({t:S(b,0),type:'B',done:false,l:false,r:false});
+  kick(0,[0,2]); snare(0,[1,3]);
+  both(1); kick(1,[2]); snare(1,[1,3]);
+  [2,3,4,6,7,8].forEach(b=>{kick(b,[0,2]); snare(b,[1,3]);});
+  [5,9].forEach(b=>{kick(b,[0,2.5]); snare(b,[3]);});
+  for(let b=10;b<18;b++){ if(b===14){both(14); kick(14,[2]); snare(14,[1,3]);}
+    else {kick(b,[0,2]); snare(b,[1,3]);} }
+  kick(18,[0]); snare(18,[3]);
+  kick(19,[0]); snare(19,[2]);
+  [20,21].forEach(b=>{kick(b,[0,2.5]); snare(b,[3]);});
+  both(22); kick(22,[2]); snare(22,[1,3]);
+  kick(23,[0,2]); snare(23,[1,3]);
+  kick(24,[0,2]); snare(24,[1,3]);
+  kick(25,[0,2,2.5]); snare(25,[1,3]);
+  kick(26,[0]); snare(26,[3]);
+  kick(27,[0]); snare(27,[3]);
+  kick(28,[0,2]); snare(28,[1,3]);
+  both(29); kick(29,[2]); snare(29,[1,3]);
+  kick(30,[0,2]);
   const bts=D.filter(c=>c.type==='B').map(c=>c.t);
   D=D.filter(c=>c.type==='B'||!bts.some(bt=>Math.abs(c.t-bt)<0.15));
   WV.push({t:S(18,0),dur:8*BEAT},{t:S(26,0),dur:8*BEAT});
@@ -295,8 +314,9 @@ let state='menu', paused=false, pauseAt=0;
 let now=-CFG.lead, t0Perf=0, schedIdx=0;
 let score=0, combo=0, maxCombo=0, comboT=-99, hitsJ=0, judgedCnt=0;
 let floats=[], parts=[], banner={txt:'',t:-99}, lastBar=-1;
-const holds=new Map();      // pointerId -> нота с удержанием
-const pointers=new Map();   // pointerId -> {role,...}
+let lineFlashT=-99;
+const holds=new Map();
+const pointers=new Map();
 let bgGrad=null, wavePluckI=0;
 
 function addScore(base){ score+=Math.round(base*(1+Math.min(combo,50)/50)); }
@@ -310,13 +330,13 @@ function rr(x,y,w,h,r){ w=Math.max(0,w); h=Math.max(0,h); r=Math.max(0,Math.min(
   ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
   ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
 function pathY(x,ph){ return L.waveY+L.waveA*Math.sin(x/240*2*Math.PI+ph); }
-function chipSpd(){ return (L.hitY-(L.hiwayTop-50))/CFG.approach; }
+function chipSpd(){ return (L.lineY-(L.hiwayTop-50))/CFG.approach; }
 
 /* ================= СТАРТ / ПАУЗА / ФИНАЛ ================= */
 function startGame(){
   ensureAudio(); buildChart();
   score=0;combo=0;maxCombo=0;hitsJ=0;judgedCnt=0;comboT=-99;
-  floats=[];parts=[];banner={txt:'',t:-99};lastBar=-1;schedIdx=0;wavePluckI=0;
+  floats=[];parts=[];banner={txt:'',t:-99};lastBar=-1;schedIdx=0;wavePluckI=0;lineFlashT=-99;
   holds.clear();pointers.clear();
   t0Perf=performance.now()/1000+CFG.lead;
   now=-CFG.lead; paused=false; state='play';
@@ -345,18 +365,18 @@ function endGame(){
 /* ================= ВВОД ================= */
 function zoneAt(x,y){
   for(const w of WV){ if(w.active && y>=L.band[0]-30 && y<=L.band[1]) return {role:'wave',w}; }
-  if(y>=L.drumY-2) return {role:'drum'};
-  if(y>=L.melY-64) return {role:'mel'};
+  if(y>=L.rowY-2) return {role:'drum'};
+  if(y>=L.lineY-55) return {role:'mel'};
   return null;
 }
 function nearestMel(x){ let idx=0,bd=1e9;
-  for(let i=0;i<7;i++){ const b=melBtn(i); const d=Math.abs(x-b.cx); if(d<bd){bd=d;idx=i;} } return idx; }
+  for(let i=0;i<2;i++){ const b=noteBtn(i); const d=Math.abs(x-b.cx); if(d<bd){bd=d;idx=i;} } return idx; }
 function handleDown(pid,x,y){
   if(state!=='play'||paused)return;
   const z=zoneAt(x,y); if(!z)return;
   if(z.role==='wave'){ if(z.w.pid==null){ z.w.pid=pid; z.w.mx=x; z.w.my=y; pointers.set(pid,{role:'wave',x,y}); } return; }
   if(z.role==='mel'){ const idx=nearestMel(x); pointers.set(pid,{role:'mel',idx}); melodyPress(idx,pid); return; }
-  if(z.role==='drum'){ const pad=x<(L.padGapX[0]+L.pw+7)?0:1; pointers.set(pid,{role:'drum',pad}); drumPress(pad); }
+  if(z.role==='drum'){ const pad=x<L.padSplit?0:1; pointers.set(pid,{role:'drum',pad}); drumPress(pad); }
 }
 function handleUp(pid){
   const p=pointers.get(pid); if(!p)return;
@@ -368,36 +388,35 @@ function melodyPress(idx,pid){
   let best=null,bd=1e9;
   for(const n of M){
     if(n.judged)continue;
-    if(n.deg-1!==idx)continue;
+    if(n.lane-1!==idx)continue;
     const dt=Math.abs(now-n.t);
-    if(dt<=CFG.holdTol&&dt<bd){bd=dt;best=n;}
+    if(dt<=CFG.goodTol&&dt<bd){bd=dt;best=n;}
   }
-  const b=melBtn(idx);
+  const b=noteBtn(idx);
   if(best){
     best.judged=true; best.hit=true;
     const perf=bd<=CFG.perfTol;
     combo++; if(combo>maxCombo)maxCombo=combo; comboT=now;
     hitsJ++; judgedCnt++;
-    addScore(perf?100:60);
-    addFloat(b.cx,L.melY-24,perf?'ОТЛИЧНО!':'ХОРОШО',perf?'#ffd43b':'#74c0fc');
-    burst(b.cx,L.melY,COLORS[best.deg-1]);
+    if(perf){ addScore(200); lineFlashT=now; addFloat(b.cx,L.lineY-26,'ИДЕАЛЬНО!','#ffd43b');
+      burst(b.cx,L.lineY,'#ffd43b'); vibrate(22); }
+    else { addScore(80); addFloat(b.cx,L.lineY-26,'ХОРОШО','#74c0fc'); burst(b.cx,L.lineY,LANE_COLORS[idx]); vibrate(10); }
     playNote(best.deg,best.oct,1);
-    vibrate(perf?18:10);
     if(best.hold){ best.holdActive=true; holds.set(pid,best); startHoldSound(best); }
     else best.popT=now;
-  } else playNote(idx+1,0,0.4);
+  } else playNote(idx===0?1:5,0,0.4);
 }
 function releaseMel(pid){
   const n=holds.get(pid); if(!n)return;
   holds.delete(pid); n.holdActive=false; stopHoldSound(n);
   const endT=n.t+n.dur*BEAT;
   const prog=Math.min(Math.max((now-n.t)/(n.dur*BEAT),0),1);
-  const b=melBtn(n.deg-1);
+  const b=noteBtn(n.lane-1);
   if(now>=endT-0.15){
     n.holdDone=true; n.popT=now;
     combo+=2; if(combo>maxCombo)maxCombo=combo; comboT=now;
-    addScore(120); addFloat(b.cx,L.melY-24,'ДЕРЖАЛ!','#51cf66'); vibrate(20);
-  } else { addScore(Math.round(60*prog)); addFloat(b.cx,L.melY-24,'РАННО','#adb5bd'); }
+    addScore(120); addFloat(b.cx,L.lineY-26,'ДЕРЖАЛ!','#51cf66'); vibrate(20);
+  } else { addScore(Math.round(60*prog)); addFloat(b.cx,L.lineY-26,'РАННО','#adb5bd'); }
 }
 function drumPress(pad){
   if(pad===0)playKick(); else playSnare();
@@ -409,24 +428,24 @@ function drumPress(pad){
   if(best.type===(pad===0?'L':'R')){
     best.done=true; hitsJ++; judgedCnt++;
     combo++; if(combo>maxCombo)maxCombo=combo; comboT=now;
-    addScore(50);
-    addFloat(r.cx,L.drumY-20,pad===0?'БАМ!':'ЦСС!',pad===0?'#74c0fc':'#ffa94d');
-    burst(r.cx,L.drumY,pad===0?'#74c0fc':'#ffa94d');
+    addScore(50); lineFlashT=now;
+    addFloat(r.cx,L.lineY-24,pad===0?'БАМ!':'ЦСС!',pad===0?'#74c0fc':'#ffa94d');
+    burst(r.cx,L.lineY,pad===0?'#74c0fc':'#ffa94d');
   } else if(best.type==='B'){
     if(pad===0)best.l=true; else best.r=true;
     if(best.l&&best.r){
       best.done=true; hitsJ++; judgedCnt++;
       combo+=2; if(combo>maxCombo)maxCombo=combo; comboT=now;
-      addScore(150); playCrash();
-      addFloat(padMidX(),L.drumY-24,'ВМЕСТЕ! ⚡','#b197fc');
-      burst(padRect(0).cx,L.drumY,'#b197fc'); burst(padRect(1).cx,L.drumY,'#b197fc');
+      addScore(150); playCrash(); lineFlashT=now;
+      addFloat(padMidX(),L.lineY-24,'ВМЕСТЕ! ⚡','#b197fc');
+      burst(padRect(0).cx,L.lineY,'#b197fc'); burst(padRect(1).cx,L.lineY,'#b197fc');
       vibrate(35);
     }
   }
 }
 function isPressedMel(i){
   for(const p of pointers.values()) if(p.role==='mel'&&p.idx===i) return true;
-  for(const n of holds.values()) if(n.deg-1===i) return true;
+  for(const n of holds.values()) if(n.lane-1===i) return true;
   return false;
 }
 function isPressedDrum(p){
@@ -447,21 +466,21 @@ function update(dt){
   for(const n of M){
     if(!n.judged&&now>n.t+0.25){
       n.judged=true; n.hit=false; combo=0; judgedCnt++;
-      addFloat(laneX(n.deg),L.melY-24,'МИМО','#ff6b6b');
+      addFloat(laneX(n.lane),L.lineY-26,'МИМО','#ff6b6b');
     }
     if(n.holdActive&&now>=n.t+n.dur*BEAT-0.03){
       for(const [pid,nn] of holds){ if(nn===n)holds.delete(pid); }
       n.holdActive=false; stopHoldSound(n); n.holdDone=true; n.popT=now;
       combo+=2; if(combo>maxCombo)maxCombo=combo; comboT=now;
-      addScore(120); addFloat(laneX(n.deg),L.melY-24,'ДЕРЖАЛ!','#51cf66');
+      addScore(120); addFloat(laneX(n.lane),L.lineY-26,'ДЕРЖАЛ!','#51cf66');
     }
     if(n.holdActive){ n.accPts+=90*dt; if(n.accPts>=10){ addScore(Math.round(n.accPts)); n.accPts-=Math.round(n.accPts); } }
   }
   for(const c of D){
     if(!c.done&&now>c.t+CFG.drumTol+0.06){
-      if(c.type==='B'&&(c.l||c.r)){ c.done=true; judgedCnt++; addScore(30); addFloat(padMidX(),L.drumY-24,'ПОЧТИ','#adb5bd'); }
+      if(c.type==='B'&&(c.l||c.r)){ c.done=true; judgedCnt++; addScore(30); addFloat(padMidX(),L.lineY-24,'ПОЧТИ','#adb5bd'); }
       else { c.done=true; judgedCnt++; combo=0;
-        addFloat(c.type==='L'?padRect(0).cx:c.type==='R'?padRect(1).cx:padMidX(),L.drumY-24,'МИМО','#ff6b6b'); }
+        addFloat(c.type==='L'?padRect(0).cx:c.type==='R'?padRect(1).cx:padMidX(),L.lineY-24,'МИМО','#ff6b6b'); }
     }
   }
   for(const w of WV){
@@ -548,54 +567,53 @@ function drawMelodyChips(){
   for(const n of M){
     if(n.popT&&now-n.popT<0.22){
       const k=(now-n.popT)/0.22;
-      ctx.globalAlpha=1-k; ctx.strokeStyle=COLORS[n.deg-1]; ctx.lineWidth=3;
-      ctx.beginPath(); ctx.arc(laneX(n.deg),L.hitY,18+k*30,0,7); ctx.stroke();
+      ctx.globalAlpha=1-k; ctx.strokeStyle=LANE_COLORS[n.lane-1]; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.arc(laneX(n.lane),L.lineY,18+k*30,0,7); ctx.stroke();
       ctx.globalAlpha=1; continue;
     }
     if(n.judged&&n.hit&&!n.holdActive)continue;
-    const headY=L.hitY-(n.t-now)*spd;
+    const headY=L.lineY-(n.t-now)*spd;
     const tailY=headY-n.dur*BEAT*spd;
-    if(n.judged&&tailY>L.stripTop+6)continue;
+    if(n.judged&&tailY>L.rowY+6)continue;
     if(headY<L.hiwayTop-60)continue;
-    const x=laneX(n.deg);
+    const x=laneX(n.lane);
     let alpha=1;
-    if(headY>L.melY+L.bh)alpha=Math.max(0,1-(headY-(L.melY+L.bh))/70);
+    if(headY>L.rowY)alpha=Math.max(0,1-(headY-L.rowY)/70);
     if(alpha<=0){ctx.globalAlpha=1;continue;}
     ctx.globalAlpha=alpha;
     if(n.dur>1){
       const hTail=Math.max(0,headY-17-tailY);
       ctx.fillStyle='rgba(255,255,255,0.18)';
-      rr(x-L.bw*0.32,tailY,L.bw*0.64,hTail,10); ctx.fill();
+      rr(x-L.bw*0.3,tailY,L.bw*0.6,hTail,10); ctx.fill();
       if(n.holdActive){
         const prog=Math.max(0,Math.min((now-n.t)/(n.dur*BEAT),1));
         ctx.fillStyle='rgba(81,207,102,0.55)';
-        rr(x-L.bw*0.32,tailY+hTail*(1-prog),L.bw*0.64,hTail*prog,10); ctx.fill();
+        rr(x-L.bw*0.3,tailY+hTail*(1-prog),L.bw*0.6,hTail*prog,10); ctx.fill();
       }
     }
     const grd=ctx.createLinearGradient(0,headY-17,0,headY+17);
-    grd.addColorStop(0,COLORS[n.deg-1]); grd.addColorStop(1,shade(COLORS[n.deg-1],-40));
+    grd.addColorStop(0,LANE_COLORS[n.lane-1]); grd.addColorStop(1,shade(LANE_COLORS[n.lane-1],-40));
     ctx.fillStyle=n.judged?'rgba(134,142,150,0.55)':grd;
-    rr(x-L.bw*0.44,headY-17,L.bw*0.88,34,10); ctx.fill();
+    rr(x-L.bw*0.42,headY-17,L.bw*0.84,34,10); ctx.fill();
     ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1.5;
-    rr(x-L.bw*0.44,headY-17,L.bw*0.88,34,10); ctx.stroke();
+    rr(x-L.bw*0.42,headY-17,L.bw*0.84,34,10); ctx.stroke();
     ctx.fillStyle='#0b1020'; ctx.font='800 19px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(n.deg,x,headY+1);
+    ctx.fillText(n.lane,x,headY+1);
     ctx.globalAlpha=1;
   }
 }
 function drawDrumChips(){
   const spd=chipSpd();
-  const hitDY=L.drumY+L.padH*0.5;
   for(const c of D){
     if(c.done&&now>c.t)continue;
-    const y=hitDY-(c.t-now)*spd;
+    const y=L.lineY-(c.t-now)*spd;
     if(y<L.hiwayTop-40)continue;
-    let alpha=1; if(y>hitDY)alpha=Math.max(0,1-(y-hitDY)/60);
+    let alpha=1; if(y>L.lineY)alpha=Math.max(0,1-(y-L.lineY)/60);
     if(alpha<=0)continue;
     ctx.globalAlpha=alpha;
-    const yC=Math.min(y,hitDY);
+    const yC=Math.min(y,L.lineY);
     if(c.type==='B'){
-      const x0=L.padGapX[0]+6,x1=L.padGapX[1]+L.pw-6;
+      const x0=padRect(0).x+6,x1=padRect(1).x+padRect(1).w-6;
       ctx.fillStyle='#7048e8'; rr(x0,yC-16,x1-x0,32,16); ctx.fill();
       ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=2; rr(x0,yC-16,x1-x0,32,16); ctx.stroke();
       ctx.fillStyle='#fff'; ctx.font='800 16px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -611,54 +629,61 @@ function drawDrumChips(){
     ctx.globalAlpha=1;
   }
 }
-function drawButtons(){
-  for(let i=0;i<7;i++){
-    const b=melBtn(i);
-    const pressed=isPressedMel(i);
-    ctx.fillStyle=pressed?COLORS[i]+'59':'rgba(20,27,51,0.92)';
-    rr(b.x,L.melY,b.w,L.bh,12); ctx.fill();
-    ctx.lineWidth=pressed?3:2; ctx.strokeStyle=COLORS[i];
-    if(pressed){ctx.shadowColor=COLORS[i]; ctx.shadowBlur=16;}
-    rr(b.x,L.melY,b.w,L.bh,12); ctx.stroke();
-    ctx.shadowBlur=0;
-    ctx.fillStyle=pressed?'#fff':COLORS[i];
-    ctx.font='800 22px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(i+1,b.cx,L.melY+L.bh*0.4);
-    ctx.font='600 10px system-ui'; ctx.fillStyle='rgba(255,255,255,0.55)';
-    ctx.fillText(NOTE_RU[i],b.cx,L.melY+L.bh*0.72);
-    for(const n of holds.values()) if(n.deg-1===i){
-      const prog=Math.max(0,Math.min((now-n.t)/(n.dur*BEAT),1));
-      ctx.fillStyle='rgba(81,207,102,0.85)';
-      rr(b.x+4,L.melY+L.bh-8,(b.w-8)*prog,5,3); ctx.fill();
-    }
-  }
-  // ЦИФРЫ ПОД КНОПКАМИ — отдельная полоса, рисуется ПОСЛЕДНИМИ, ничего их не перекрывает
-  for(let i=0;i<7;i++){
-    const b=melBtn(i);
-    ctx.fillStyle=COLORS[i]; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.font='900 20px system-ui';
-    ctx.fillText(i+1,b.cx,L.stripTop+12);
-    ctx.font='700 10px system-ui'; ctx.globalAlpha=0.75;
-    ctx.fillText(NOTE_RU[i],b.cx,L.stripTop+27);
-    ctx.globalAlpha=1;
+function drawHitLine(){
+  const flash=Math.max(0,1-(now-lineFlashT)/0.3);
+  ctx.save();
+  if(flash>0){ ctx.shadowColor='#ffd43b'; ctx.shadowBlur=14*flash; }
+  ctx.strokeStyle=flash>0?'rgba(255,212,59,'+(0.55+0.45*flash).toFixed(2)+')':'rgba(255,255,255,0.85)';
+  ctx.lineWidth=3+2*flash;
+  ctx.beginPath(); ctx.moveTo(L.ox+6,L.lineY); ctx.lineTo(L.ox+L.cw-6,L.lineY); ctx.stroke();
+  ctx.restore();
+  // стрелки-указатели на дорожках нот
+  ctx.fillStyle='rgba(255,255,255,0.45)';
+  for(let i=0;i<2;i++){
+    const cx=noteBtn(i).cx;
+    ctx.beginPath();
+    ctx.moveTo(cx-7,L.lineY+8); ctx.lineTo(cx+7,L.lineY+8); ctx.lineTo(cx,L.lineY+18);
+    ctx.closePath(); ctx.fill();
   }
 }
-function drawPads(){
-  const labels=[['БАМ','кик • левый палец','#339af0'],['ЦСС','снэр • правый палец','#ff922b']];
+function drawRow(){
+  // барабаны по краям
+  const pads=[['БАМ','кик • левый палец','#339af0'],['ЦСС','снэр • правый палец','#ff922b']];
   for(let p=0;p<2;p++){
     const r=padRect(p);
     const pressed=isPressedDrum(p);
-    ctx.fillStyle=pressed?labels[p][2]+'66':'rgba(23,31,61,0.95)';
+    ctx.fillStyle=pressed?pads[p][2]+'66':'rgba(23,31,61,0.95)';
     rr(r.x,r.y,r.w,r.h,16); ctx.fill();
-    ctx.strokeStyle=labels[p][2]; ctx.lineWidth=pressed?3:2;
-    if(pressed){ctx.shadowColor=labels[p][2]; ctx.shadowBlur=18;}
+    ctx.strokeStyle=pads[p][2]; ctx.lineWidth=pressed?3:2;
+    if(pressed){ctx.shadowColor=pads[p][2]; ctx.shadowBlur=18;}
     rr(r.x,r.y,r.w,r.h,16); ctx.stroke();
     ctx.shadowBlur=0;
-    ctx.fillStyle=pressed?'#fff':labels[p][2];
+    ctx.fillStyle=pressed?'#fff':pads[p][2];
     ctx.font='900 24px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(labels[p][0],r.cx,r.y+r.h*0.42);
+    ctx.fillText(pads[p][0],r.cx,r.y+r.h*0.42);
     ctx.font='600 10px system-ui'; ctx.fillStyle='rgba(255,255,255,0.6)';
-    ctx.fillText(labels[p][1],r.cx,r.y+r.h*0.68);
+    ctx.fillText(pads[p][1],r.cx,r.y+r.h*0.68);
+  }
+  // кнопки нот 1 и 2 в центре
+  for(let i=0;i<2;i++){
+    const b=noteBtn(i);
+    const pressed=isPressedMel(i);
+    ctx.fillStyle=pressed?LANE_COLORS[i]+'59':'rgba(20,27,51,0.92)';
+    rr(b.x,L.rowY,b.w,L.bh,14); ctx.fill();
+    ctx.lineWidth=pressed?3:2; ctx.strokeStyle=LANE_COLORS[i];
+    if(pressed){ctx.shadowColor=LANE_COLORS[i]; ctx.shadowBlur=16;}
+    rr(b.x,L.rowY,b.w,L.bh,14); ctx.stroke();
+    ctx.shadowBlur=0;
+    ctx.fillStyle=pressed?'#fff':LANE_COLORS[i];
+    ctx.font='900 30px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(i+1,b.cx,L.rowY+L.bh*0.38);
+    ctx.font='600 10px system-ui'; ctx.fillStyle='rgba(255,255,255,0.55)';
+    ctx.fillText(i===0?'нота • клавиша 1':'нота • клавиша 2',b.cx,L.rowY+L.bh*0.72);
+    for(const n of holds.values()) if(n.lane-1===i){
+      const prog=Math.max(0,Math.min((now-n.t)/(n.dur*BEAT),1));
+      ctx.fillStyle='rgba(81,207,102,0.85)';
+      rr(b.x+4,L.rowY+L.bh-8,(b.w-8)*prog,5,3); ctx.fill();
+    }
   }
 }
 function drawHUD(){
@@ -684,9 +709,9 @@ function drawCountdown(){
   if(now>=0)return;
   ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillStyle='#ffd43b'; ctx.font='900 64px system-ui';
-  ctx.fillText(String(Math.min(Math.ceil(-now),3)),L.ox+L.cw/2,L.hitY-150);
+  ctx.fillText(String(Math.min(Math.ceil(-now),3)),L.ox+L.cw/2,L.lineY-160);
   ctx.font='700 16px system-ui'; ctx.fillStyle='#fff';
-  ctx.fillText('Приготовься!',L.ox+L.cw/2,L.hitY-100);
+  ctx.fillText('Жми на белой линии!',L.ox+L.cw/2,L.lineY-110);
 }
 function drawBanner(){
   if(!banner.txt||now-banner.t>1.4)return;
@@ -712,7 +737,7 @@ function drawIdle(){
   for(let i=0;i<10;i++){
     const x=(Math.sin(i*2.7+t*0.25)*0.5+0.5)*W;
     const y=(Math.sin(i*1.3+t*0.18+2)*0.5+0.5)*H*0.9;
-    ctx.globalAlpha=0.06; ctx.fillStyle=COLORS[i%7];
+    ctx.globalAlpha=0.06; ctx.fillStyle=LANE_COLORS[i%2];
     ctx.beginPath(); ctx.arc(x,y,30+(i%4)*14,0,7); ctx.fill();
   }
   ctx.globalAlpha=1;
@@ -724,14 +749,14 @@ function draw(){
   }
   ctx.fillStyle=bgGrad; ctx.fillRect(0,0,W,H);
   if(state==='menu'){ drawIdle(); return; }
-  ctx.strokeStyle='rgba(255,255,255,0.045)'; ctx.lineWidth=1;
-  for(let i=0;i<7;i++){ const b=melBtn(i);
-    ctx.beginPath(); ctx.moveTo(b.cx,L.hiwayTop); ctx.lineTo(b.cx,L.melY); ctx.stroke(); }
+  ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1;
+  for(let i=0;i<2;i++){ const b=noteBtn(i);
+    ctx.beginPath(); ctx.moveTo(b.cx,L.hiwayTop); ctx.lineTo(b.cx,L.lineY); ctx.stroke(); }
   for(const w of WV) if(w.active) drawWave(w);
   drawDrumChips();
   drawMelodyChips();
-  drawButtons();
-  drawPads();
+  drawHitLine();
+  drawRow();
   drawHUD();
   drawCountdown();
   drawBanner();
@@ -764,16 +789,17 @@ window.addEventListener('pointerup',e=>handleUp(e.pointerId),{passive:true});
 window.addEventListener('pointercancel',e=>handleUp(e.pointerId),{passive:true});
 window.addEventListener('keydown',e=>{
   if(state!=='play'||e.repeat)return;
-  if(e.code.startsWith('Digit')){ const i=+e.code.slice(5)-1;
-    if(i>=0&&i<7){ pointers.set(1000+i,{role:'mel',idx:i}); melodyPress(i,1000+i); } }
-  if(e.code==='KeyZ'){ pointers.set(2000,{role:'drum',pad:0}); drumPress(0); }
-  if(e.code==='KeyX'){ pointers.set(2001,{role:'drum',pad:1}); drumPress(1); }
+  if(e.code==='Digit1'){ pointers.set(1000,{role:'mel',idx:0}); melodyPress(0,1000); }
+  if(e.code==='Digit2'){ pointers.set(1001,{role:'mel',idx:1}); melodyPress(1,1001); }
+  if(e.code==='KeyZ'||e.code==='ArrowLeft'){ pointers.set(2000,{role:'drum',pad:0}); drumPress(0); }
+  if(e.code==='KeyX'||e.code==='ArrowRight'){ pointers.set(2001,{role:'drum',pad:1}); drumPress(1); }
   if(e.code==='Escape'||e.code==='KeyP'){ paused?doResume():doPause(); }
 });
 window.addEventListener('keyup',e=>{
-  if(e.code.startsWith('Digit')){ const i=+e.code.slice(5)-1; if(i>=0&&i<7)handleUp(1000+i); }
-  if(e.code==='KeyZ')handleUp(2000);
-  if(e.code==='KeyX')handleUp(2001);
+  if(e.code==='Digit1')handleUp(1000);
+  if(e.code==='Digit2')handleUp(1001);
+  if(e.code==='KeyZ'||e.code==='ArrowLeft')handleUp(2000);
+  if(e.code==='KeyX'||e.code==='ArrowRight')handleUp(2001);
 });
 $('#btnPause').addEventListener('click',()=>paused?doResume():doPause());
 $('#btnResume').addEventListener('click',()=>doResume());
