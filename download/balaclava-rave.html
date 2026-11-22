@@ -102,7 +102,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
     <div id="mascot"></div>
     <svg class="spike-strip" data-spikes="1"></svg>
     <div class="coverNote">7 ТРЕКОВ • БЕЗ СЛОВ • 2–3 МИН • НОЧНОЙ КОР / ТЕХНО / ДРАМ-ЭНД-БЕЙС</div>
-    <div class="ctrlLine">УПРАВЛЕНИЕ: <b>D F J K</b> • 4 КНОПКИ ПО БОКАМ БАС И ДРАМ, В ЦЕНТРЕ КИК И НОТА • ГЕЙМПАД LB LT RT RB</div>
+    <div class="ctrlLine">УПРАВЛЕНИЕ: <b>D F J K</b> • ПО БОКАМ БАС И ДРАМ, В ЦЕНТРЕ КИК И НОТА • ГЕЙМПАД: <b>X A B Y</b> ИЛИ LB LT RT RB</div>
     <div class="schRow" id="schRow">
       <span class="schLbl">СХЕМА:</span>
       <button class="schip on" data-s="auto">АВТО</button>
@@ -150,6 +150,19 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 </div>
 <script>
 'use strict';
+/* --- баннер ошибок: если что-то падает, видно причину --- */
+window.addEventListener('error',function(e){
+  var el=document.getElementById('errBanner');
+  if(!el){
+    el=document.createElement('div');el.id='errBanner';
+    el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:999;background:#7f1d1d;color:#fecaca;font:600 12px system-ui;padding:6px 10px;text-align:center';
+    (document.body||document.documentElement).appendChild(el);
+  }
+  el.textContent='ОШИБКА: '+(e.message||'?')+(e.lineno?' (строка '+e.lineno+')':'');
+});
+/* --- безопасное хранилище (не убивать игру, если localStorage заблокирован) --- */
+function sGet(k){try{return window.localStorage.getItem(k);}catch(e){return null;}}
+function sSet(k,v){try{window.localStorage.setItem(k,v);}catch(e){}}
 /* ====================== ОБЩЕЕ СОСТОЯНИЕ ====================== */
 var cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 var W=0,H=0,DPR=1;
@@ -159,7 +172,7 @@ var floats=[],bursts=[],laneFlash=[0,0,0,0],lanePress=[-9,-9,-9,-9];
 var comboPopT=-9;
 var PERF=0.07,GOOD=0.15,TAPP=1.5;
 var isTouch=('ontouchstart' in window)||(navigator.maxTouchPoints>0);
-var scheme=localStorage.getItem('br_scheme')||'auto';
+var scheme=sGet('br_scheme')||'auto';
 var padSeen=false;
 var laneCol=['#7c3aed','#a855f7','#d946ef','#f0abfc'];
 var padPrev={};
@@ -168,11 +181,13 @@ var padPrev={};
 var AC=null,MG=null;
 function ensureAudio(){
   if(AC)return;
-  AC=new (window.AudioContext||window.webkitAudioContext)();
-  var comp=AC.createDynamicsCompressor();
-  comp.threshold.value=-13;comp.knee.value=18;comp.ratio.value=7;comp.attack.value=0.003;comp.release.value=0.18;
-  MG=AC.createGain();MG.gain.value=0.85;
-  MG.connect(comp);comp.connect(AC.destination);
+  try{
+    AC=new (window.AudioContext||window.webkitAudioContext)();
+    var comp=AC.createDynamicsCompressor();
+    comp.threshold.value=-13;comp.knee.value=18;comp.ratio.value=7;comp.attack.value=0.003;comp.release.value=0.18;
+    MG=AC.createGain();MG.gain.value=0.85;
+    MG.connect(comp);comp.connect(AC.destination);
+  }catch(e){AC=null;}
 }
 var _nb=null;
 function noiseBuf(){
@@ -492,13 +507,14 @@ function layout(){
 /* ====================== ИГРА: ПОТОК ====================== */
 var acStart=0;
 function startTrack(tr){
-  ensureAudio();AC.resume();
+  ensureAudio();
+  if(AC&&AC.resume)AC.resume();
   buildTrack(tr);
   score=0;combo=0;maxCombo=0;mult=1;perfectCnt=0;goodCnt=0;missCnt=0;judgedCnt=0;lastChordF=-9;
   floats=[];bursts=[];laneFlash=[0,0,0,0];comboPopT=-9;
   state='play';paused=false;now=-2.2;
   t0=performance.now()/1000+2.2;
-  acStart=AC.currentTime+2.2;
+  acStart=AC?AC.currentTime+2.2:0;
   var tb=document.getElementById('tbtns');
   tb.classList.remove('hidden');tb.classList.toggle('on',touchVisible());
   layout();
@@ -511,8 +527,8 @@ function finish(){
   var acc=accNow();
   var rank=acc>=0.95?'S':acc>=0.88?'A':acc>=0.75?'B':acc>=0.6?'C':'D';
   var key='br_best_'+TRK.id,prev=null;
-  try{prev=JSON.parse(localStorage.getItem(key)||'null');}catch(e){}
-  if(!prev||score>prev.score){try{localStorage.setItem(key,JSON.stringify({score:score,acc:Math.round(acc*100),rank:rank}));}catch(e){}}
+  try{prev=JSON.parse(sGet(key)||'null');}catch(e){}
+  if(!prev||score>prev.score)sSet(key,JSON.stringify({score:score,acc:Math.round(acc*100),rank:rank}));
   document.getElementById('resTrack').textContent=TRK.name+' • '+TRK.tag;
   var rEl=document.getElementById('resRank');
   rEl.textContent=rank;
@@ -574,10 +590,17 @@ function hitNote(idx,dt){
       if(m.t<n.t-0.03)continue;
       if(m.judged&&!m.miss)g++;
     }
-    if(g>=2&&now-lastChordF>0.12){
-      lastChordF=now;
+    if(g>=2){
       score+=30*(g-1)*Math.round(mult);
-      addFloat(W/2,lineY-100,'ЧОРД ×'+g,'#f0abfc');
+      if(now-lastChordF>0.12){
+        lastChordF=now;
+        addFloat(W/2,lineY-100,'ЧОРД ×'+g,'#f0abfc');
+      }else{
+        /* допresses аккорда: обновить плашку до полного размера */
+        for(var fi=floats.length-1;fi>=0;fi--){
+          if(floats[fi].txt.indexOf('ЧОРД')===0){floats[fi].txt='ЧОРД ×'+g;break;}
+        }
+      }
     }
   }
 }
@@ -608,6 +631,7 @@ function playNote(n,v){
 }
 /* ====================== ФОНОВЫЙ СЕКВЕНСОР ====================== */
 function schedTick(){
+  if(!AC)return;
   var horizon=now+0.45;
   while(EVid<EV.length&&EV[EVid].t<horizon){
     var e=EV[EVid++],at=acStart+e.t;
@@ -631,19 +655,27 @@ function update(dt){
   if(now>DUR+1.2)finish();
 }
 /* ====================== ГЕЙМПАД ====================== */
+/* Xbox 360: лица X/A/B/Y на 4 дорожки слева направо + плечи/триггеры + крестовина */
+var PADMAP=[
+  [2,0],[4,0],[14,0],   /* левая дорожка: X, LB, крестовина-влево */
+  [0,1],[6,1],          /* вторая: A, LT */
+  [1,2],[7,2],          /* третья: B, RT */
+  [3,3],[5,3],[15,3]    /* правая: Y, RB, крестовина-вправо */
+];
 function pollPad(){
-  var gps=navigator.getGamepads?navigator.getGamepads():[];
+  var gps=null;
+  try{gps=navigator.getGamepads?navigator.getGamepads():null;}catch(e){gps=null;}
   var gp=gps&&(gps[0]||gps[1]);
-  if(!gp||!gp.connected)return;
+  if(!gp||!gp.connected||!gp.buttons)return;
   padSeen=true;
-  var map=[[4,0],[6,1],[7,2],[5,3]];
-  for(var i=0;i<4;i++){
-    var b=gp.buttons[map[i][0]],p=!!(b&&b.pressed);
-    if(p&&!padPrev[map[i][0]]&&state==='play'&&!paused)pressLane(map[i][1]);
-    padPrev[map[i][0]]=p;
+  for(var i=0;i<PADMAP.length;i++){
+    var bi=PADMAP[i][0],ln=PADMAP[i][1];
+    var b=gp.buttons[bi],p=!!(b&&(b.pressed||b.value>0.5));
+    if(p&&!padPrev[bi]&&state==='play'&&!paused)pressLane(ln);
+    padPrev[bi]=p;
   }
   var st=!!(gp.buttons[9]&&gp.buttons[9].pressed);
-  if(st&&!padPrev[9]&&state==='play'){paused?doResume():doPause();}
+  if(st&&!padPrev[9]&&state==='play'){if(paused)doResume();else doPause();}
   padPrev[9]=st;
 }
 /* ====================== ОТРИСОВКА ====================== */
@@ -823,7 +855,7 @@ function buildMenus(){
     var dur=88*4*60/tr.bpm;
     var mm=Math.floor(dur/60),ss=('0'+Math.round(dur%60)).slice(-2);
     var best=null;
-    try{best=JSON.parse(localStorage.getItem('br_best_'+tr.id)||'null');}catch(e){}
+    try{best=JSON.parse(sGet('br_best_'+tr.id)||'null');}catch(e){}
     var d=document.createElement('div');
     d.className='tcard';
     d.innerHTML='<div class="tnum">0'+(ix+1)+'</div><div class="tname">'+tr.name+'</div>'+
@@ -871,7 +903,7 @@ document.getElementById('btnQuit').addEventListener('click',function(){document.
 document.getElementById('schRow').addEventListener('click',function(e){
   var b=e.target.closest('.schip');if(!b)return;
   scheme=b.dataset.s;
-  try{localStorage.setItem('br_scheme',scheme);}catch(err){}
+  sSet('br_scheme',scheme);
   document.querySelectorAll('.schip').forEach(function(c){c.classList.toggle('on',c.dataset.s===scheme);});
 });
 /* ====================== ТЕСТ-ХУКИ И ЦИКЛ ====================== */
