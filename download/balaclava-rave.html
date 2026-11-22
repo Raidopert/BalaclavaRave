@@ -88,6 +88,32 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 .tb span{font-weight:900;font-size:clamp(.72rem,2.9vw,.95rem);letter-spacing:.14em}
 .tb i{font-style:normal;font-size:.6rem;color:var(--dim);font-weight:800;letter-spacing:.2em}
 .tb.hit{background:linear-gradient(180deg,var(--lc,#8b5cf6),rgba(168,85,247,.25));box-shadow:0 0 22px var(--lc,#8b5cf6)}
+/* ---------- КНОПКА ПАУЗЫ НА ЭКРАНЕ ---------- */
+#btnPauseOv{position:absolute;right:12px;bottom:14px;width:46px;height:46px;border-radius:50%;
+  border:1px solid var(--v1);background:rgba(14,10,28,.78);color:#d6cdfb;font-size:16px;font-weight:900;
+  cursor:pointer;z-index:15;display:none;align-items:center;justify-content:center;letter-spacing:.05em}
+#btnPauseOv.on{display:flex}
+#btnPauseOv:hover{background:#1c1240;box-shadow:0 0 14px rgba(139,92,246,.45)}
+#tbtns.on~#btnPauseOv{bottom:calc(132px + env(safe-area-inset-bottom))}
+/* ---------- НАСТРОЙКИ УПРАВЛЕНИЯ ---------- */
+#setOv{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+  background:rgba(5,3,10,.9);z-index:40;padding:16px}
+#setOv.on{display:flex}
+#setBox{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px 24px;
+  width:min(94vw,560px);max-height:88vh;overflow-y:auto;box-shadow:0 0 40px rgba(139,92,246,.25)}
+.setTitle{font-weight:900;font-size:1.1rem;letter-spacing:.18em;color:#fff;text-align:center;margin-bottom:6px}
+.setSec{font-size:.72rem;font-weight:800;letter-spacing:.22em;color:var(--v4);margin:13px 0 7px;
+  border-top:1px solid var(--line);padding-top:11px}
+.setRow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 0;
+  font-size:.74rem;color:var(--dim);font-weight:700;letter-spacing:.05em}
+.setRow span{flex:1}
+.keyBtn{min-width:110px;background:#0c0916;border:1px solid var(--v1);color:#fff;font-weight:900;
+  font-size:.8rem;padding:8px 12px;border-radius:4px;cursor:pointer;letter-spacing:.08em}
+.keyBtn:hover{background:#1c1240}
+.keyBtn.cap{border-color:#ffd700;color:#ffd700;box-shadow:0 0 14px rgba(255,215,0,.4);animation:capblink 1s infinite}
+@keyframes capblink{50%{opacity:.5}}
+.setHint{font-size:.6rem;color:var(--dim);letter-spacing:.08em;margin-top:7px;line-height:1.7}
+.setBtns{display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap}
 .hidden{display:none!important}
 ::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:#241a44;border-radius:4px}
 </style>
@@ -102,7 +128,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
     <div id="mascot"></div>
     <svg class="spike-strip" data-spikes="1"></svg>
     <div class="coverNote">7 ТРЕКОВ • БЕЗ СЛОВ • 2–3 МИН • НОЧНОЙ КОР / ТЕХНО / ДРАМ-ЭНД-БЕЙС</div>
-    <div class="ctrlLine">КЛАВИАТУРА: <b>D F J K</b> (+ <b>→</b> = F, <b>X</b> = J) • ГЕЙМПАД: <b>LB</b> • <b>СТРЕЛКА →</b> • <b>X</b> • <b>RB</b> (+LT RT) • СЛОЖНОСТИ: 3 КНОПКИ / 4 КНОПКИ / ФУЛЛ СКОРОСТЬ</div>
+    <div class="ctrlLine">КЛАВИАТУРА: <b>D F J K</b> (+ <b>→</b> = F, <b>X</b> = J) • ГЕЙМПАД: <b>LB</b> • <b>СТРЕЛКА →</b> • <b>X</b> • <b>RB</b> (+LT RT) • ПАУЗА: <b>ESC / P / START</b> • СЛОЖНОСТИ: 3 / 4 КНОПКИ / ФУЛЛ • КЛАВИШИ МОЖНО ПЕРЕНАЗНАЧИТЬ: <b>⚙</b></div>
     <div class="schRow" id="schRow">
       <span class="schLbl">СХЕМА:</span>
       <button class="schip on" data-s="auto">АВТО</button>
@@ -110,6 +136,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
       <button class="schip" data-s="touch">СЕНСОР</button>
       <button class="schip" data-s="pad">ГЕЙМПАД</button>
     </div>
+    <button id="btnSetCover" class="btn ghost">⚙ НАСТРОЙКИ УПРАВЛЕНИЯ</button>
     <button id="btnPlay" class="btn main"><b>▶ ИГРАТЬ</b></button>
   </section>
   <section id="scrTracks" class="screen">
@@ -143,6 +170,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
     <div class="pauseCard">
       <div class="pTitle">ПАУЗА</div>
       <button id="btnResume" class="btn main"><b>ПРОДОЛЖИТЬ</b></button>
+      <button id="btnSettings" class="btn ghost"><b>⚙ НАСТРОЙКИ УПРАВЛЕНИЯ</b></button>
       <button id="btnRestart" class="btn ghost"><b>ЗАНОВО</b></button>
       <button id="btnQuit" class="btn ghost"><b>В МЕНЮ</b></button>
     </div>
@@ -153,6 +181,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
     <button class="tb" data-l="2" style="--lc:#d946ef"><span>НОТА</span><i>J</i></button>
     <button class="tb" data-l="3" style="--lc:#f0abfc"><span>ДРАМ</span><i>K</i></button>
   </div>
+  <button id="btnPauseOv" title="Пауза (ESC / P / START)">⏸</button>
+  <div id="setOv"><div id="setBox"></div></div>
 </div>
 <script>
 'use strict';
@@ -191,6 +221,15 @@ var DIFFMETA={
 };
 var NL=4,KEYLBL=['D','F','J','K'];
 var PACKS=[],BARS_BUSY={},applauseFired=false;
+/* --- переназначаемые привязки (сохраняются) --- */
+var KB=(function(){try{var a=JSON.parse(sGet('br_kb')||'null');
+  if(a&&a.length===4&&a.every(function(c){return typeof c==='string';}))return a;}catch(e){}
+  return ['KeyD','KeyF','KeyJ','KeyK'];})();
+var PADM=(function(){try{var a=JSON.parse(sGet('br_padm')||'null');
+  if(a&&a.length===4&&a.every(function(n){return typeof n==='number'&&n>=0&&n<17&&n!==9;}))return a;}catch(e){}
+  return [4,15,2,5];})();
+var tbMode=sGet('br_tbmode');if(tbMode!=='on'&&tbMode!=='off')tbMode='auto';
+var setOpen=false,capKB=null,capPad=null;
 
 /* ====================== АУДИО ДВИЖОК ====================== */
 var AC=null,MG=null;
@@ -561,7 +600,11 @@ function insertSnakes(tr,spb,st){
 /* ====================== ИГРА: РАСКЛАДКА ====================== */
 var LW=120,lineY=0;
 function laneXOf(l){return (W-LW*NL)/2+l*LW;}
-function touchVisible(){return scheme==='touch'||(scheme==='auto'&&isTouch);}
+function touchVisible(){
+  if(tbMode==='on')return true;
+  if(tbMode==='off')return false;
+  return scheme==='touch'||(scheme==='auto'&&isTouch);
+}
 function layout(){
   DPR=Math.min(window.devicePixelRatio||1,2);
   W=window.innerWidth;H=window.innerHeight;
@@ -588,9 +631,11 @@ function startTrack(tr){
   t0=performance.now()/1000+2.2;
   acStart=AC?AC.currentTime+2.2:0;
   var tb=document.getElementById('tbtns'),h='';
-  for(var l=0;l<dm.nl;l++)h+='<button class="tb" data-l="'+l+'" style="--lc:'+laneCol[l]+'"><span>'+dm.names[l]+'</span><i>'+dm.keys[l]+'</i></button>';
+  for(var l=0;l<dm.nl;l++)h+='<button class="tb" data-l="'+l+'" style="--lc:'+laneCol[l]+'"><span>'+dm.names[l]+'</span><i>'+keyName(KB[l])+'</i></button>';
   tb.innerHTML=h;
+  KEYLBL=KB.map(keyName).slice(0,dm.nl);
   tb.classList.remove('hidden');tb.classList.toggle('on',touchVisible());
+  document.getElementById('btnPauseOv').classList.add('on');
   document.getElementById('pauseOv').classList.remove('on');
   layout();
   showScreen(null);
@@ -621,6 +666,7 @@ function finish(){
     '<div>СЛОЖНОСТЬ <b>'+DIFFMETA[DIFFV].name+'</b></div><div>ИСПЫТАНИЯ <b>'+pk+'/9 • +'+pb+'</b></div>'+
     '<div>ФУЛЛ КОМБО <b>'+(fc?'+3000':'—')+'</b></div>';
   document.getElementById('tbtns').classList.remove('on');
+  document.getElementById('btnPauseOv').classList.remove('on');
   showScreen('scrRes');
 }
 function doPause(){
@@ -761,21 +807,33 @@ function update(dt){
   if(now>DUR+1.2)finish();
 }
 /* ====================== ГЕЙМПАД ====================== */
-/* Xbox 360: LB | стрелка вправо | X | RB — по дорожкам слева направо (+LT/RT и крестовина-влево) */
-var PADMAP=[
-  [4,0],[14,0],   /* LB, крестовина-влево → крайняя левая (БАС) */
-  [15,1],[6,1],   /* стрелка вправо, LT → вторая (F) */
-  [2,2],[7,2],    /* X, RT → третья (J) */
-  [5,3]           /* RB → крайняя правая (ДРАМ) */
-];
+/* Xbox 360: привязки в PADM (по умолчанию LB | стрелка → | X | RB),
+   всегда дублируют: LT→дорожка 2, RT→дорожка 3, крестовина-влево→дорожка 1 */
 function pollPad(){
   var gps=null;
   try{gps=navigator.getGamepads?navigator.getGamepads():null;}catch(e){gps=null;}
   var gp=gps&&(gps[0]||gps[1]);
   if(!gp||!gp.connected||!gp.buttons)return;
   padSeen=true;
-  for(var i=0;i<PADMAP.length;i++){
-    var bi=PADMAP[i][0],ln=PADMAP[i][1];
+  /* режим захвата: переназначение кнопки геймпада */
+  if(capPad!=null){
+    for(var c=0;c<gp.buttons.length;c++){
+      if(c===9){padPrev[9]=!!(gp.buttons[9]&&gp.buttons[9].pressed);continue;}
+      var cb=gp.buttons[c],cp=!!(cb&&(cb.pressed||cb.value>0.5));
+      if(cp&&!padPrev[c]){
+        var old2=PADM.indexOf(c);
+        if(old2>=0&&old2!==capPad)PADM[old2]=PADM[capPad];
+        PADM[capPad]=c;
+        sSet('br_padm',JSON.stringify(PADM));
+        capPad=null;buildSet();
+      }
+      padPrev[c]=cp;
+    }
+    return;
+  }
+  var PM=[[PADM[0],0],[14,0],[PADM[1],1],[6,1],[PADM[2],2],[7,2],[PADM[3],3]];
+  for(var i=0;i<PM.length;i++){
+    var bi=PM[i][0],ln=PM[i][1];
     var b=gp.buttons[bi],p=!!(b&&(b.pressed||b.value>0.5));
     if(p&&!padPrev[bi]&&state==='play'&&!paused)pressLane(ln);
     padPrev[bi]=p;
@@ -784,6 +842,51 @@ function pollPad(){
   if(st&&!padPrev[9]&&state==='play'){if(paused)doResume();else doPause();}
   padPrev[9]=st;
 }
+/* ====================== НАСТРОЙКИ УПРАВЛЕНИЯ ====================== */
+function keyName(c){
+  if(!c)return '—';
+  var m={ArrowRight:'→',ArrowLeft:'←',ArrowUp:'↑',ArrowDown:'↓',Space:'ПРОБЕЛ',
+    ShiftLeft:'L-SHIFT',ShiftRight:'R-SHIFT',ControlLeft:'L-CTRL',ControlRight:'R-CTRL',
+    AltLeft:'L-ALT',AltRight:'R-ALT',Semicolon:';',Quote:"'",Backquote:'`',Minus:'-',Equal:'=',
+    Comma:',',Period:'.',Slash:'/',Backslash:'\\',BracketLeft:'[',BracketRight:']',
+    Enter:'ENTER',Tab:'TAB',Backspace:'BKSP',CapsLock:'CAPS'};
+  if(m[c])return m[c];
+  return c.replace(/^Key/,'').replace(/^Digit/,'').replace(/^Numpad/,'NUM');
+}
+function padName(i){
+  return {0:'A',1:'B',2:'X',3:'Y',4:'LB',5:'RB',6:'LT',7:'RT',8:'SELECT',10:'L3',11:'R3',
+    12:'СТРЕЛКА ↑',13:'СТРЕЛКА ↓',14:'СТРЕЛКА ←',15:'СТРЕЛКА →',16:'ГУБКА'}[i]||('КНОПКА '+i);
+}
+function buildSet(){
+  var box=document.getElementById('setBox');
+  var ln=['1 • БАС (КРАЙНЯЯ ЛЕВАЯ)','2 • КИК','3 • НОТА','4 • ДРАМ (КРАЙНЯЯ ПРАВАЯ)'];
+  var h='<div class="setTitle">НАСТРОЙКИ УПРАВЛЕНИЯ</div>';
+  h+='<div class="setSec">КЛАВИАТУРА — НАЖМИ НА КНОПКУ, ПОТОМ НАЖМИ НОВУЮ КЛАВИШУ</div>';
+  for(var i=0;i<4;i++){
+    h+='<div class="setRow"><span>ДОРОЖКА '+ln[i]+'</span>'+
+      '<button class="keyBtn'+(capKB===i?' cap':'')+'" data-kb="'+i+'">'+(capKB===i?'НАЖМИ КЛАВИШУ…':keyName(KB[i]))+'</button></div>';
+  }
+  h+='<div class="setHint">ВСЕГДА РАБОТАЮТ: 1 2 3 4 (дорожки) • ESC / P — пауза • если клавиша уже занята — дорожки поменяются местами</div>';
+  h+='<div class="setBtns"><button class="btn ghost" data-r="kb"><b>СБРОС: D F J K</b></button></div>';
+  h+='<div class="setSec">ГЕЙМПАД — НАЖМИ НА КНОПКУ, ПОТОМ КНОПКУ ПАДА</div>';
+  for(var j=0;j<4;j++){
+    h+='<div class="setRow"><span>ДОРОЖКА '+ln[j]+'</span>'+
+      '<button class="keyBtn'+(capPad===j?' cap':'')+'" data-pd="'+j+'">'+(capPad===j?'НАЖМИ КНОПКУ…':padName(PADM[j]))+'</button></div>';
+  }
+  h+='<div class="setHint">ВСЕГДА РАБОТАЮТ: LT, RT, КРЕСТОВИНА-ВЛЕВО (дублируют дорожки) • START — пауза • конфликт — дорожки поменяются местами</div>';
+  h+='<div class="setBtns"><button class="btn ghost" data-r="pad"><b>СБРОС: LB → X RB</b></button></div>';
+  h+='<div class="setSec">КНОПКИ ДОРОЖЕК НА ЭКРАНЕ (ВНИЗУ)</div>';
+  h+='<div class="setBtns">';
+  [['auto','АВТО'],['on','ВСЕГДА'],['off','НИКОГДА']].forEach(function(t){
+    h+='<button class="schip'+(tbMode===t[0]?' on':'')+'" data-t="'+t[0]+'">'+t[1]+'</button>';
+  });
+  h+='</div>';
+  h+='<div class="setHint">АВТО — показывать на сенсорных экранах • ВСЕГДА — большие кнопки дорожек внизу во время игры</div>';
+  h+='<div class="setBtns"><button id="setClose" class="btn main"><b>✕ ЗАКРЫТЬ</b></button></div>';
+  box.innerHTML=h;
+}
+function openSet(){setOpen=true;capKB=null;capPad=null;buildSet();document.getElementById('setOv').classList.add('on');}
+function closeSet(){setOpen=false;capKB=null;capPad=null;document.getElementById('setOv').classList.remove('on');}
 /* ====================== ОТРИСОВКА ====================== */
 function drawBg(){
   var g=ctx.createLinearGradient(0,0,0,H);
@@ -1007,8 +1110,21 @@ function buildMenus(){
 /* ====================== ВВОД ====================== */
 window.addEventListener('keydown',function(e){
   if(e.repeat)return;
-  var map={KeyD:0,KeyF:1,KeyJ:2,KeyK:3,Digit1:0,Digit2:1,Digit3:2,Digit4:3,ArrowRight:1,KeyX:2};
-  if(map[e.code]!==undefined){e.preventDefault();pressLane(map[e.code]);}
+  /* режим захвата: переназначение клавиши дорожки */
+  if(capKB!=null){
+    e.preventDefault();
+    if(e.code!=='Escape'){
+      var old=KB.indexOf(e.code);
+      if(old>=0&&old!==capKB)KB[old]=KB[capKB];
+      KB[capKB]=e.code;
+      sSet('br_kb',JSON.stringify(KB));
+    }
+    capKB=null;buildSet();return;
+  }
+  if(setOpen){if(e.code==='Escape'||e.code==='KeyP')closeSet();return;}
+  var m={Digit1:0,Digit2:1,Digit3:2,Digit4:3,ArrowRight:1,KeyX:2};
+  for(var l=0;l<4;l++)m[KB[l]]=l;
+  if(m[e.code]!==undefined){e.preventDefault();pressLane(m[e.code]);}
   if((e.code==='Escape'||e.code==='KeyP')&&state==='play'){if(paused)doResume();else doPause();}
 });
 var tbEl=document.getElementById('tbtns');
@@ -1030,12 +1146,32 @@ cv.addEventListener('pointerdown',function(e){
   if(l>=0&&l<NL)pressLane(l);
 });
 document.getElementById('btnPlay').addEventListener('click',function(){ensureAudio();showScreen('scrTracks');});
+document.getElementById('btnSetCover').addEventListener('click',openSet);
+document.getElementById('btnSettings').addEventListener('click',openSet);
+document.getElementById('btnPauseOv').addEventListener('click',function(){
+  if(state==='play'&&!paused)doPause();
+});
+document.getElementById('setBox').addEventListener('click',function(e){
+  var kb=e.target.closest('[data-kb]');
+  if(kb){capKB=+kb.dataset.kb;capPad=null;buildSet();return;}
+  var pd=e.target.closest('[data-pd]');
+  if(pd){capPad=+pd.dataset.pd;capKB=null;buildSet();return;}
+  var tm=e.target.closest('[data-t]');
+  if(tm){tbMode=tm.dataset.t;sSet('br_tbmode',tbMode);buildSet();return;}
+  var rs=e.target.closest('[data-r]');
+  if(rs){
+    if(rs.dataset.r==='kb'){KB=['KeyD','KeyF','KeyJ','KeyK'];sSet('br_kb',JSON.stringify(KB));}
+    else{PADM=[4,15,2,5];sSet('br_padm',JSON.stringify(PADM));}
+    buildSet();return;
+  }
+  if(e.target.closest('#setClose')||e.target.id==='setOv')closeSet();
+});
 document.getElementById('btnBack').addEventListener('click',function(){showScreen('scrCover');});
 document.getElementById('btnAgain').addEventListener('click',function(){if(TRK)startTrack(TRK);});
 document.getElementById('btnTracks').addEventListener('click',function(){state='menu';buildMenus();showScreen('scrTracks');});
 document.getElementById('btnResume').addEventListener('click',doResume);
 document.getElementById('btnRestart').addEventListener('click',function(){document.getElementById('pauseOv').classList.remove('on');if(AC)AC.resume();if(TRK)startTrack(TRK);});
-document.getElementById('btnQuit').addEventListener('click',function(){document.getElementById('pauseOv').classList.remove('on');if(AC)AC.resume();state='menu';document.getElementById('tbtns').classList.remove('on');buildMenus();showScreen('scrCover');});
+document.getElementById('btnQuit').addEventListener('click',function(){document.getElementById('pauseOv').classList.remove('on');document.getElementById('btnPauseOv').classList.remove('on');if(AC)AC.resume();state='menu';document.getElementById('tbtns').classList.remove('on');buildMenus();showScreen('scrCover');});
 document.getElementById('schRow').addEventListener('click',function(e){
   var b=e.target.closest('.schip');if(!b)return;
   scheme=b.dataset.s;
