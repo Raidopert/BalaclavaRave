@@ -172,6 +172,13 @@ html,body{overscroll-behavior:none}
       <button class="schip on" data-d="mid">СРЕДНИЙ</button>
       <button class="schip" data-d="hard">СЛОЖНЫЙ</button>
     </div>
+    <div class="schRow" id="styleRow">
+      <span class="schLbl">СТРАТЕГИЯ:</span>
+      <button class="schip on" data-s="classic" title="Стандартные правила">КЛАССИКА</button>
+      <button class="schip" data-s="sniper" title="Узкие окна попадания, очки ×1.5">СНАЙПЕР</button>
+      <button class="schip" data-s="flow" title="Широкие окна, МИМО не рвёт комбо, очки ×0.75">ПОТОК</button>
+      <button class="schip" data-s="risk" title="МИМО −200 очков, комбо растёт быстрее">РИСК</button>
+    </div>
     <div id="trackList"></div>
   </section>
   <section id="scrEditor" class="screen">
@@ -260,6 +267,18 @@ var DIFFMETA={
   mid:{name:'СРЕДНИЙ',tapp:1.6},
   hard:{name:'СЛОЖНЫЙ',tapp:1.15}
 };
+/* --- стратегии: модификаторы риска/награды (wm=окна, pm=очки, cap/step=множитель,
+       nobreak=МИМО не рвёт комбо, penalty=штраф очков за МИМО) --- */
+var STYLMETA={
+  classic:{name:'КЛАССИКА',wm:1,pm:1,cap:8,step:8,nobreak:false,penalty:0},
+  sniper:{name:'СНАЙПЕР',wm:0.6,pm:1.5,cap:8,step:8,nobreak:false,penalty:0},
+  flow:{name:'ПОТОК',wm:1.35,pm:0.75,cap:6,step:8,nobreak:true,penalty:0},
+  risk:{name:'РИСК',wm:1,pm:1.2,cap:14,step:6,nobreak:false,penalty:200}
+};
+var STYLEV=(function(){var d=sGet('br_style');return (d&&STYLMETA[d])?d:'classic';})();
+var SPERF=PERF,SGOOD=GOOD;
+function styleSync(){var st=STYLMETA[STYLEV];SPERF=PERF*st.wm;SGOOD=GOOD*st.wm;}
+styleSync();
 var LANE_NAMES=['БАС','КИК','НОТА','ДРАМ'];
 var NL=4,KEYLBL=['D','F','J','K'];
 var PACKS=[],BARS_BUSY={},applauseFired=false;
@@ -707,6 +726,7 @@ function loadTrackAudio(tr){
 }
 function startTrack(tr){
   TAPPV=DIFFMETA[DIFFV].tapp;
+  styleSync();
   ensureAudio();
   if(AC&&AC.resume)AC.resume();
   buildTrack(tr);
@@ -737,7 +757,7 @@ function finish(){
   PACKS.forEach(function(p){if(p.done){pk++;pb+=p.bonus;}});
   var fc=(missCnt===0&&judgedCnt>0);
   if(fc)score+=3000;
-  var key='br_best_'+TRK.id+'_'+DIFFV,prev=null;
+  var key='br_best_'+TRK.id+'_'+DIFFV+'_'+STYLEV,prev=null;
   try{prev=JSON.parse(sGet(key)||'null');}catch(e){}
   if(!prev||score>prev.score)sSet(key,JSON.stringify({score:score,acc:Math.round(acc*100),rank:rank,pk:pk,pn:PACKS.length}));
   document.getElementById('resTrack').textContent=TRK.name+' • '+TRK.tag;
@@ -752,7 +772,7 @@ function finish(){
     '<div>ИДЕАЛЬНО <b>'+perfectCnt+'</b></div><div>ОК <b>'+goodCnt+'</b></div>'+
     '<div>МИМО <b>'+missCnt+'</b></div><div>МУЛЬТИПЛИКАТОР <b>×'+mv+'</b></div>'+
     '<div>СЛОЖНОСТЬ <b>'+DIFFMETA[DIFFV].name+'</b></div><div>ИСПЫТАНИЯ <b>'+pk+'/'+PACKS.length+' • +'+pb+'</b></div>'+
-    '<div>ФУЛЛ КОМБО <b>'+(fc?'+3000':'—')+'</b></div>';
+    '<div>ФУЛЛ КОМБО <b>'+(fc?'+3000':'—')+'</b></div><div>СТРАТЕГИЯ <b>'+STYLMETA[STYLEV].name+'</b></div>';
   document.getElementById('tbtns').classList.remove('on');
   document.getElementById('btnPauseOv').classList.remove('on');
   showScreen('scrRes');
@@ -782,23 +802,23 @@ function pressLane(l){
   var best=-1,bd=1e9;
   for(var i=CHid;i<CH.length;i++){
     var n=CH[i];
-    if(n.t>now+GOOD)break;
+    if(n.t>now+SGOOD)break;
     if(n.lane!==l||n.judged)continue;
     var d=Math.abs(n.t-now);
     if(d<bd){bd=d;best=i;}
   }
-  if(best>=0&&bd<=GOOD)hitNote(best,bd);
+  if(best>=0&&bd<=SGOOD)hitNote(best,bd);
   else freePlay(l);
 }
 function hitNote(idx,dt){
   var n=CH[idx];
   if(n.judged)return;
-  n.judged=true;n.hit=true;n.perf=dt<=PERF;
+  n.judged=true;n.hit=true;n.perf=dt<=SPERF;
   judgedCnt++;
   if(n.perf)perfectCnt++;else goodCnt++;
   combo++;if(combo>maxCombo)maxCombo=combo;comboPopT=now;
-  mult=1+Math.min(7,Math.floor(combo/8)*0.5);
-  score+=Math.round((n.perf?100:55)*mult);
+  mult=1+Math.min(STYLMETA[STYLEV].cap-1,Math.floor(combo/STYLMETA[STYLEV].step)*0.5);
+  score+=Math.round((n.perf?100:55)*mult*STYLMETA[STYLEV].pm);
   addFloat(laneXOf(n.lane)+LW/2,lineY-34,n.perf?'ИДЕАЛЬНО':'ОК',n.perf?'#c4b5fd':'#8f86ad');
   bursts.push({x:laneXOf(n.lane)+LW/2,y:lineY,t:now,col:laneCol[n.lane]});
   playNote(n,1);
@@ -881,7 +901,11 @@ function update(dt){
   while(CHid<CH.length&&CH[CHid].t<now-GOOD){
     var n=CH[CHid];
     if(!n.judged){
-      n.judged=true;n.miss=true;missCnt++;judgedCnt++;combo=0;mult=1;applauseFired=false;
+      n.judged=true;n.miss=true;missCnt++;judgedCnt++;applauseFired=false;
+      var stm=STYLMETA[STYLEV];
+      if(stm.nobreak){combo=Math.floor(combo/2);mult=Math.max(1,mult*0.6);}
+      else{combo=0;mult=1;}
+      if(stm.penalty){score=Math.max(0,score-stm.penalty);addFloat(laneXOf(n.lane)+LW/2,lineY-58,'−'+stm.penalty,'#ff5c8a');}
       addFloat(laneXOf(n.lane)+LW/2,lineY-30,'МИМО','#ff5c8a');
       if(n.snk!=null){
         var pkf=PACKS[n.snk];
@@ -1229,7 +1253,7 @@ function buildMenus(){
     var dur=trackDur(tr);
     var mm=Math.floor(dur/60),ss=('0'+Math.round(dur%60)).slice(-2);
     var best=null;
-    try{best=JSON.parse(sGet('br_best_'+tr.id+'_'+DIFFV)||'null');}catch(e){}
+    try{best=JSON.parse(sGet('br_best_'+tr.id+'_'+DIFFV+'_'+STYLEV)||'null');}catch(e){}
     var d=document.createElement('div');
     d.className='tcard';
     d.innerHTML='<div class="tnum">'+(ix+1<10?'0':'')+(ix+1)+'</div><div class="tname">'+tr.name+'</div>'+
@@ -1240,7 +1264,13 @@ function buildMenus(){
     tl.appendChild(d);
   });
   document.querySelectorAll('#diffRow .schip').forEach(function(c){c.classList.toggle('on',c.dataset.d===DIFFV);});
+  document.querySelectorAll('#styleRow .schip').forEach(function(c){c.classList.toggle('on',c.dataset.s===STYLEV);});
 }
+document.querySelectorAll('#styleRow .schip').forEach(function(c){c.addEventListener('click',function(){
+  STYLEV=c.dataset.s;sSet('br_style',STYLEV);styleSync();
+  document.querySelectorAll('#styleRow .schip').forEach(function(x){x.classList.toggle('on',x===c);});
+  buildMenus();
+});});
 /* ====================== ВВОД ====================== */
 window.addEventListener('keydown',function(e){
   if(e.repeat)return;
