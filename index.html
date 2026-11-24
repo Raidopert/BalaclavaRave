@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>BALACLAVA RAVE — лондонский андеграунд</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b0718">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<script>if('serviceWorker' in navigator&&/^https/.test(location.protocol)){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script>
 <style>
 :root{
   --bg:#070510; --panel:#0e0a1c; --panel2:#120c24; --line:#2a1f4d;
@@ -16,6 +24,16 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 #ui{position:fixed;inset:0;pointer-events:none}
 #ui>*{pointer-events:auto}
 .screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
+/* ---------- РЕДАКТОР ТРЕКОВ ---------- */
+.edWrap{width:min(94%,880px);margin:12px auto 0;display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;padding-bottom:14px}
+.edRow{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.edMsg{text-align:center;font-weight:800;font-size:.78rem;letter-spacing:.08em;color:#9d8fd0;min-height:1.2em}
+.edMsg.ok{color:#a7f3d0}.edMsg.err{color:#fda4af}
+#edText{width:100%;flex:1;min-height:200px;background:rgba(14,10,28,.92);border:1px solid var(--line);border-radius:6px;
+  color:#e6e0ff;font:600 .76rem/1.45 ui-monospace,Consolas,monospace;padding:12px;resize:none;outline:none}
+#edText:focus{border-color:#8b5cf6;box-shadow:0 0 14px rgba(139,92,246,.35)}
+.edHelp{font-size:.66rem;color:#7a6fae;text-align:center;letter-spacing:.04em;line-height:1.5}
+html,body{overscroll-behavior:none}
   overflow-y:auto;overflow-x:hidden;padding:16px;-webkit-overflow-scrolling:touch}
 .screen.on{display:flex}
 /* ---------- ОБЛОЖКА ---------- */
@@ -130,6 +148,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
     <svg class="spike-strip" data-spikes="1"></svg>
     <button id="btnSetCover" class="btn ghost">⚙ НАСТРОЙКИ УПРАВЛЕНИЯ</button>
     <button id="btnPlay" class="btn main"><b>▶ ИГРАТЬ</b></button>
+    <button id="btnEditor" class="btn ghost">🎛 РЕДАКТОР ТРЕКОВ</button>
   </section>
   <section id="scrTracks" class="screen">
     <header class="bar">
@@ -144,6 +163,22 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
       <button class="schip" data-d="hard">СЛОЖНЫЙ</button>
     </div>
     <div id="trackList"></div>
+  </section>
+  <section id="scrEditor" class="screen">
+    <div class="bar"><div class="barTitle">РЕДАКТОР ТРЕКОВ</div></div>
+    <div class="edWrap">
+      <div class="edRow">
+        <button id="edTest" class="btn">▶ ПРОГНАТЬ</button>
+        <button id="edSave" class="btn">💾 ДОБАВИТЬ</button>
+        <button id="edImport" class="btn ghost">📥 ЗАМЕНИТЬ ВСЁ</button>
+        <button id="edExport" class="btn ghost">📄 В ТЕКСТ</button>
+        <button id="edClear" class="btn ghost">🗑 СТЕРЕТЬ</button>
+        <button id="edBack" class="btn ghost"><b>← НАЗАД</b></button>
+      </div>
+      <div id="edMsg" class="edMsg">Вставь JSON одного трека или массива треков</div>
+      <textarea id="edText" spellcheck="false" placeholder='{"name":"МОЙ ТРЕК","bpm":130,"loopBeats":16,"mel":[[0,1,69],[1,1,72],[2,1,74],[3,1,76],[4,2,72]],"chords":[[0,4,45,[57,60,64]],[4,4,41,[53,57,60]]],"drum":{"k":[0,1,2,3],"s":[1,3]}}'></textarea>
+      <div class="edHelp">mel: [доля, длина, midi] • chords: [доля, длина, бас-midi, [ноты]] • drum.k — доли бочки, drum.s — доли малого • egap — прореживание на ЛЁГКОМ • loopBeats — длина круга в долях</div>
+    </div>
   </section>
   <section id="scrRes" class="screen">
     <div class="resCard">
@@ -561,16 +596,34 @@ function insertSnakes(tr,spb){
     }
     if(put>0){picks.push(put);lastBar=put;}
   }
-  var pat=[0,1,2,3,2,1,0,1,2];
+  var PATS=[
+    {nm:'🐍 ЗМЕЙКА',sq:[0,1,2,3,2,1,0,1,2]},
+    {nm:'🌊 ВОЛНА',sq:[1,2,3,2,1,0,1,2,3]},
+    {nm:'⚡ РАЗБЕГ',sq:[0,2,1,3,0,2,1,3,0]},
+    {nm:'🌀 ПИЛКА',sq:[0,3,1,2,3,0,2,1,3]},
+    {nm:'💧 КАСКАД',sq:[[0],[0,1],[1,2],[2,3],[2,3],[1,2],[0,1],[0],[0,1,2]]}
+  ];
   picks.forEach(function(pb,pi){
-    var t0=pb*4*spb,c=chordAt(tr,pb*4),tones=c[3].concat([c[3][0]+12]);
+    var pat=PATS[pi%PATS.length];
+    var t0=pb*4*spb;
+    /* тоны берём из мелодии рядом с баром — лесенка «поёт» тему трека */
+    var tones=[];
+    tr.mel.forEach(function(mn){
+      if(mn[0]>=pb*4-2&&mn[0]<pb*4+6&&tones.indexOf(mn[2])<0)tones.push(mn[2]);
+    });
+    if(tones.length<4){var c=chordAt(tr,pb*4);tones=c[3].concat([c[3][0]+12,c[3][1]+12]);}
     CH=CH.filter(function(n){return n.t<t0-1.1*spb-0.01||n.t>t0+5.1*spb+0.01;});
     var pack={i:pi,t0:t0,t1:t0+4*spb,hits:0,done:false,failed:false,bonus:500,notes:[]};
     for(var k=0;k<9;k++){
-      var n=mk(pat[k],t0+k*.5*spb,(tr.leadKind||'lead'),[tones[pat[k]]],0.4*spb,1);
-      n.snk=pi;CH.push(n);pack.notes.push(n);
+      var step=pat.sq[k],lanes=Array.isArray(step)?step:[step];
+      if(DIFFV==='easy'&&lanes.length>1)lanes=[lanes[0]];
+      var tone=tones[(pi*2+k)%tones.length];
+      lanes.forEach(function(ln){
+        var n=mk(ln,t0+k*.5*spb,(tr.leadKind||'lead'),[tone],0.4*spb,1);
+        n.snk=pi;CH.push(n);pack.notes.push(n);
+      });
     }
-    SECF.push({t:t0,txt:'🐍 ИСПЫТАНИЕ'});
+    SECF.push({t:t0,txt:pat.nm});
     PACKS.push(pack);
   });
 }
@@ -712,7 +765,7 @@ function hitNote(idx,dt){
   if(n.snk!=null){
     var pk=PACKS[n.snk];
     pk.hits++;
-    if(pk.hits>=9&&!pk.done&&!pk.failed){
+    if(pk.hits>=pk.notes.length&&!pk.done&&!pk.failed){
       pk.done=true;score+=pk.bonus;
       addFloat(W/2,lineY-116,'ИСПЫТАНИЕ ✓ +'+pk.bonus,'#ffd700');
       bursts.push({x:W/2,y:lineY-70,t:now,col:'#ffd700'});
@@ -1078,7 +1131,7 @@ function draw(){
 }
 /* ====================== ЭКРАНЫ И МЕНЮ ====================== */
 function showScreen(id){
-  ['scrCover','scrTracks','scrRes'].forEach(function(s){
+  ['scrCover','scrTracks','scrRes','scrEditor'].forEach(function(s){
     document.getElementById(s).classList.toggle('on',s===id);
   });
 }
@@ -1109,14 +1162,14 @@ function buildMenus(){
   });
   var tl=document.getElementById('trackList');
   tl.innerHTML='';
-  TRACKS.forEach(function(tr,ix){
+  LIST().forEach(function(tr,ix){
     var dur=trackDur(tr);
     var mm=Math.floor(dur/60),ss=('0'+Math.round(dur%60)).slice(-2);
     var best=null;
     try{best=JSON.parse(sGet('br_best_'+tr.id+'_'+DIFFV)||'null');}catch(e){}
     var d=document.createElement('div');
     d.className='tcard';
-    d.innerHTML='<div class="tnum">0'+(ix+1)+'</div><div class="tname">'+tr.name+'</div>'+
+    d.innerHTML='<div class="tnum">'+(ix+1<10?'0':'')+(ix+1)+'</div><div class="tname">'+tr.name+'</div>'+
       '<span class="ttag">'+tr.tag+'</span>'+
       '<div class="tmeta">'+tr.bpm+' BPM • '+mm+':'+ss+' • '+'★'.repeat(tr.stars)+'</div>'+
       '<div class="tbest">'+(best?('ЛУЧШИЙ ('+DIFFMETA[DIFFV].name+'): '+best.score+' • '+best.rank+' • '+best.acc+'%'+(best.pk!=null?' • ИСП '+best.pk+'/'+(best.pn||9):'')):'НЕ ПРОЙДЕН')+'</div>';
@@ -1189,7 +1242,85 @@ document.getElementById('btnAgain').addEventListener('click',function(){if(TRK)s
 document.getElementById('btnTracks').addEventListener('click',function(){state='menu';buildMenus();showScreen('scrTracks');});
 document.getElementById('btnResume').addEventListener('click',doResume);
 document.getElementById('btnRestart').addEventListener('click',function(){document.getElementById('pauseOv').classList.remove('on');if(AC)AC.resume();if(TRK)startTrack(TRK);});
-document.getElementById('btnQuit').addEventListener('click',function(){document.getElementById('pauseOv').classList.remove('on');document.getElementById('btnPauseOv').classList.remove('on');if(AC)AC.resume();state='menu';document.getElementById('tbtns').classList.remove('on');buildMenus();showScreen('scrCover');});
+document.getElementById('btnQuit').addEventListener('click',function(){document.getElementById('pauseOv').classList.remove('on');document.getElementById('btnPauseOv').classList.remove('on');if(AC)AC.resume();state='menu';document.getElementById('tbtns').classList.remove('on');var back=ED_RETURN;ED_RETURN=false;buildMenus();showScreen(back?'scrEditor':'scrCover');});
+/* ---------- РЕДАКТОР: свои треки ---------- */
+var ED_RETURN=false;
+var CUSTOMS=[];
+try{CUSTOMS=JSON.parse(sGet('br_custom')||'[]')||[];}catch(e){CUSTOMS=[];}
+function saveCustoms(){sSet('br_custom',JSON.stringify(CUSTOMS));}
+function LIST(){return TRACKS.concat(CUSTOMS);}
+function slugId(name){return 'c_'+String(name).toLowerCase().replace(/[^a-zа-яё0-9]+/gi,'-').replace(/^-+|-+$/g,'').slice(0,20);}
+function normTrack(t){
+  var num=function(v){return typeof v==='number'&&isFinite(v);};
+  if(!t||typeof t!=='object')return 'объект не найден';
+  if(!t.name)return 'нет name';
+  if(!Array.isArray(t.mel)||!t.mel.length)return 'нет mel (мелодии)';
+  if(!Array.isArray(t.chords)||!t.chords.length)return 'нет chords (аккордов)';
+  var LB=Math.max(4,Math.min(64,Math.round(+t.loopBeats||16)));
+  for(var j=0;j<t.mel.length;j++){
+    var m=t.mel[j];
+    if(!Array.isArray(m)||m.length<3||!num(m[0])||!num(m[1])||!num(m[2]))return 'mel['+j+'] — нужен [доля, длина, midi]';
+    if(m[0]+m[1]>LB+0.001)return 'mel['+j+'] выходит за loopBeats='+LB;
+  }
+  for(var c=0;c<t.chords.length;c++){
+    var ch=t.chords[c];
+    if(!Array.isArray(ch)||ch.length<4||!Array.isArray(ch[3])||!ch[3].length||!num(ch[0])||!num(ch[1])||!num(ch[2])||!ch[3].every(num))return 'chords['+c+'] — нужен [доля, длина, бас, [ноты]]';
+  }
+  var d=t.drum||{},k=Array.isArray(d.k)&&d.k.every(num)?d.k.slice():[0,1,2,3];
+  var sv=Array.isArray(d.s)&&d.s.every(num)?d.s.slice():[1,3];
+  return {id:slugId(t.name),name:String(t.name).slice(0,26),tag:'СВОЙ',
+    bpm:Math.max(40,Math.min(300,Math.round(+t.bpm||120))),bassKind:t.bassKind||'saw',leadKind:t.leadKind||'lead',
+    stars:Math.max(1,Math.min(5,Math.round(+t.stars||3))),loopBeats:LB,egap:Math.max(1,+t.egap||1),
+    drum:{k:k,s:sv},mel:t.mel,chords:t.chords};
+}
+function edParse(limit){
+  var v=edTxt.value.trim();
+  if(!v)return {ok:false,err:'пусто — вставь JSON'};
+  var raw;try{raw=JSON.parse(v);}catch(e){return {ok:false,err:'JSON: '+e.message};}
+  var arr=Array.isArray(raw)?raw:[raw];
+  if(arr.length>limit)return {ok:false,err:'не больше '+limit+' треков за раз'};
+  var out=[];
+  for(var i=0;i<arr.length;i++){
+    var t=normTrack(arr[i]);
+    if(typeof t==='string')return {ok:false,err:'трек #'+(i+1)+': '+t};
+    out.push(t);
+  }
+  return {ok:true,list:out};
+}
+var edTxt=document.getElementById('edText'),edMsg=document.getElementById('edMsg');
+function edSay(txt,ok){edMsg.textContent=txt;edMsg.className='edMsg '+(ok?'ok':'err');}
+document.getElementById('btnEditor').addEventListener('click',function(){ED_RETURN=false;edSay('Своих треков: '+CUSTOMS.length+' • вставь JSON трека или массива',true);showScreen('scrEditor');});
+document.getElementById('edBack').addEventListener('click',function(){buildMenus();showScreen('scrCover');});
+document.getElementById('edTest').addEventListener('click',function(){
+  var r=edParse(1);
+  if(!r.ok){edSay('ОШИБКА: '+r.err,false);return;}
+  ED_RETURN=true;edSay('Прогоняю: '+r.list[0].name+' • «В МЕНЮ» вернёт в редактор',true);
+  startTrack(r.list[0]);
+});
+document.getElementById('edSave').addEventListener('click',function(){
+  var r=edParse(50);
+  if(!r.ok){edSay('ОШИБКА: '+r.err,false);return;}
+  var names={};LIST().forEach(function(t){names[t.name]=1;});
+  var add=0;
+  r.list.forEach(function(t){if(!names[t.name]){CUSTOMS.push(t);add++;}});
+  saveCustoms();buildMenus();
+  edSay(add?('ДОБАВЛЕНО '+add+' • всего своих: '+CUSTOMS.length+' — ищи в списке с меткой «СВОЙ»'):'Такое название уже есть — не добавлен',!!add);
+});
+document.getElementById('edImport').addEventListener('click',function(){
+  var r=edParse(50);
+  if(!r.ok){edSay('ОШИБКА: '+r.err,false);return;}
+  CUSTOMS=r.list;saveCustoms();buildMenus();
+  edSay('ЗАМЕНЕНО: своих треков теперь '+CUSTOMS.length,true);
+});
+document.getElementById('edExport').addEventListener('click',function(){
+  if(!CUSTOMS.length){edSay('Своих треков пока нет',false);return;}
+  edTxt.value=JSON.stringify(CUSTOMS);edSay('Треки выведены в текст ниже — копируй и храни',true);
+});
+var edArm=false;
+document.getElementById('edClear').addEventListener('click',function(){
+  if(!edArm){edArm=true;this.innerHTML='<b>ТОЧНО?</b>';return;}
+  edArm=false;this.innerHTML='🗑 СТЕРЕТЬ';CUSTOMS=[];saveCustoms();buildMenus();edSay('Свои треки стёрты',true);
+});
 document.getElementById('diffRow').addEventListener('click',function(e){
   var b=e.target.closest('.schip');if(!b||!b.dataset.d)return;
   DIFFV=b.dataset.d;
